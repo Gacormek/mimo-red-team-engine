@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiMo Red Team Engine</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a0a0a,#0a0a1a);border-bottom:1px solid #ff004020;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:1.4rem;color:#ff0040;letter-spacing:1px}
+.header .status{display:flex;gap:12px;align-items:center}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#00ff88;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.tabs{display:flex;background:#111118;border-bottom:1px solid #ffffff10;overflow-x:auto}
+.tab{padding:12px 20px;cursor:pointer;color:#888;font-size:.85rem;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+.tab:hover{color:#ccc;background:#ffffff05}
+.tab.active{color:#ff0040;border-bottom-color:#ff0040}
+.content{padding:20px;max-width:1400px;margin:0 auto}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.grid{display:grid;gap:16px}
+.grid-2{grid-template-columns:1fr 1fr}
+.grid-3{grid-template-columns:1fr 1fr 1fr}
+.grid-4{grid-template-columns:1fr 1fr 1fr 1fr}
+.card{background:#14141e;border:1px solid #ffffff08;border-radius:8px;padding:16px}
+.card h3{color:#ff0040;font-size:.9rem;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+.stat-value{font-size:2rem;font-weight:700;color:#fff}
+.stat-label{font-size:.75rem;color:#888;margin-top:4px}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600}
+.badge-critical{background:#ff004020;color:#ff0040;border:1px solid #ff004040}
+.badge-high{background:#ff660020;color:#ff6600;border:1px solid #ff660040}
+.badge-medium{background:#ffaa0020;color:#ffaa00;border:1px solid #ffaa0040}
+.badge-low{background:#00ff8820;color:#00ff88;border:1px solid #00ff8840}
+.badge-info{background:#0088ff20;color:#0088ff;border:1px solid #0088ff40}
+.badge-running{background:#00ff8820;color:#00ff88}
+.badge-error{background:#ff004020;color:#ff0040}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;padding:8px 12px;color:#888;border-bottom:1px solid #ffffff10;font-weight:500}
+td{padding:8px 12px;border-bottom:1px solid #ffffff05}
+tr:hover{background:#ffffff05}
+.btn{padding:8px 16px;border:none;border-radius:4px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s}
+.btn-primary{background:#ff0040;color:#fff}
+.btn-primary:hover{background:#ff0060}
+.btn-secondary{background:#ffffff10;color:#ccc;border:1px solid #ffffff20}
+.btn-secondary:hover{background:#ffffff20}
+input,select{background:#1a1a28;border:1px solid #ffffff10;color:#e0e0e0;padding:8px 12px;border-radius:4px;font-size:.85rem;width:100%}
+input:focus,select:focus{outline:none;border-color:#ff004040}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:.75rem;color:#888;margin-bottom:4px}
+.attack-step{background:#1a1a28;border-left:3px solid #ff0040;padding:8px 12px;margin:4px 0;border-radius:0 4px 4px 0;font-size:.8rem}
+.attack-step .mitre{color:#0088ff;font-size:.7rem}
+.mitre-cell{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:.6rem;border-radius:3px;margin:1px}
+.mitre-cell.covered{background:#ff004040;color:#ff0040}
+.mitre-cell.empty{background:#ffffff08;color:#ffffff20}
+.progress-bar{height:6px;background:#ffffff10;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .5s}
+.ws-indicator{width:6px;height:6px;border-radius:50%;display:inline-block}
+.ws-connected{background:#00ff88}
+.ws-disconnected{background:#ff0040}
+#log-panel{background:#0a0a0f;border:1px solid #ffffff08;border-radius:4px;padding:12px;max-height:300px;overflow-y:auto;font-family:monospace;font-size:.75rem;color:#888}
+.log-entry{padding:2px 0;border-bottom:1px solid #ffffff05}
+.log-entry .time{color:#555}
+.log-entry .agent{color:#ff0040}
+.log-entry .action{color:#00ff88}
+@media(max-width:768px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}.tabs{flex-wrap:nowrap}.tab{padding:10px 14px;font-size:.75rem}}
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>MIMO RED TEAM ENGINE</h1>
+    <div class="status">
+        <span class="ws-indicator ws-disconnected" id="ws-status"></span>
+        <span style="font-size:.8rem;color:#888" id="agent-count">0 agents</span>
+        <span style="font-size:.8rem;color:#888" id="uptime">0s</span>
+    </div>
+</div>
+
+<div class="tabs">
+    <div class="tab active" data-tab="overview">Overview</div>
+    <div class="tab" data-tab="recon">Recon</div>
+    <div class="tab" data-tab="vulns">Vulnerabilities</div>
+    <div class="tab" data-tab="attack">Attack Graph</div>
+    <div class="tab" data-tab="social">Social Engineering</div>
+    <div class="tab" data-tab="defense">Defense</div>
+    <div class="tab" data-tab="deception">Deception</div>
+    <div class="tab" data-tab="reports">Reports</div>
+</div>
+
+<div class="content">
+    <!-- OVERVIEW -->
+    <div class="tab-content active" id="overview">
+        <div class="grid grid-4" style="margin-bottom:16px">
+            <div class="card"><h3>Targets</h3><div class="stat-value" id="s-targets">0</div><div class="stat-label">Total targets scanned</div></div>
+            <div class="card"><h3>Findings</h3><div class="stat-value" id="s-findings">0</div><div class="stat-label">Total security findings</div></div>
+            <div class="card"><h3>Attack Paths</h3><div class="stat-value" id="s-paths">0</div><div class="stat-label">Viable attack chains</div></div>
+            <div class="card"><h3>Defenses</h3><div class="stat-value" id="s-defenses">0</div><div class="stat-label">Mitigation rules generated</div></div>
+        </div>
+        <div class="grid grid-2">
+            <div class="card">
+                <h3>Severity Distribution</h3>
+                <div style="margin-top:12px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span class="badge badge-critical">CRITICAL</span><span id="sev-critical">0</span></div>
+                    <div class="progress-bar"><div class="progress-fill" id="bar-critical" style="width:0%;background:#ff0040"></div></div>
+                    <div style="display:flex;justify-content:space-between;margin:12px 0 8px"><span class="badge badge-high">HIGH</span><span id="sev-high">0</span></div>
+                    <div class="progress-bar"><div class="progress-fill" id="bar-high" style="width:0%;background:#ff6600"></div></div>
+                    <div style="display:flex;justify-content:space-between;margin:12px 0 8px"><span class="badge badge-medium">MEDIUM</span><span id="sev-medium">0</span></div>
+                    <div class="progress-bar"><div class="progress-fill" id="bar-medium" style="width:0%;background:#ffaa00"></div></div>
+                    <div style="display:flex;justify-content:space-between;margin:12px 0 8px"><span class="badge badge-low">LOW</span><span id="sev-low">0</span></div>
+                    <div class="progress-bar"><div class="progress-fill" id="bar-low" style="width:0%;background:#00ff88"></div></div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Agent Status</h3>
+                <div id="agent-list" style="margin-top:12px"></div>
+            </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+            <h3>Activity Log</h3>
+            <div id="log-panel"></div>
+        </div>
+    </div>
+
+    <!-- RECON -->
+    <div class="tab-content" id="recon">
+        <div class="card" style="margin-bottom:16px">
+            <h3>Start Reconnaissance</h3>
+            <div class="grid grid-3" style="margin-top:12px">
+                <div class="form-group"><label>Target</label><input id="recon-target" placeholder="example.com or IP"></div>
+                <div class="form-group"><label>Type</label><select id="recon-type"><option value="domain">Domain</option><option value="ip">IP Address</option></select></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="runRecon()">Start Recon</button></div>
+            </div>
+        </div>
+        <div class="grid grid-2">
+            <div class="card"><h3>Discovered Subdomains</h3><div id="recon-subdomains" style="margin-top:8px;font-size:.85rem">No data yet</div></div>
+            <div class="card"><h3>Tech Stack</h3><div id="recon-tech" style="margin-top:8px;font-size:.85rem">No data yet</div></div>
+        </div>
+        <div class="card" style="margin-top:16px"><h3>AI Analysis</h3><div id="recon-analysis" style="margin-top:8px;font-size:.85rem;white-space:pre-wrap">No data yet</div></div>
+    </div>
+
+    <!-- VULNS -->
+    <div class="tab-content" id="vulns">
+        <div class="card" style="margin-bottom:16px">
+            <h3>Vulnerability Scan</h3>
+            <div class="grid grid-3" style="margin-top:12px">
+                <div class="form-group"><label>Target</label><input id="vuln-target" placeholder="example.com"></div>
+                <div class="form-group"><label>Target ID</label><input id="vuln-target-id" placeholder="Auto from recon"></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="runVulnScan()">Scan</button></div>
+            </div>
+        </div>
+        <div class="card"><h3>Detected Vulnerabilities</h3><table><thead><tr><th>CVE</th><th>Name</th><th>CVSS</th><th>Type</th></tr></thead><tbody id="vuln-table"><tr><td colspan="4" style="text-align:center;color:#555">No scans yet</td></tr></tbody></table></div>
+    </div>
+
+    <!-- ATTACK GRAPH -->
+    <div class="tab-content" id="attack">
+        <div class="card" style="margin-bottom:16px">
+            <h3>Generate Attack Paths</h3>
+            <div class="grid grid-3" style="margin-top:12px">
+                <div class="form-group"><label>Target</label><input id="attack-target" placeholder="example.com"></div>
+                <div class="form-group"><label>Target ID</label><input id="attack-target-id" placeholder="Auto"></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="runAttackPath()">Generate</button></div>
+            </div>
+        </div>
+        <div id="attack-paths-container"></div>
+    </div>
+
+    <!-- SOCIAL -->
+    <div class="tab-content" id="social">
+        <div class="card" style="margin-bottom:16px">
+            <h3>Phishing Campaign Generator</h3>
+            <div class="grid grid-3" style="margin-top:12px">
+                <div class="form-group"><label>Target Domain</label><input id="social-target" placeholder="example.com"></div>
+                <div class="form-group"><label>Campaign Type</label><select id="social-type"><option value="credential_harvest">Credential Harvest</option><option value="malware_delivery">Malware Delivery</option><option value="bec">Business Email Compromise</option><option value="spear_phish">Spear Phishing</option></select></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="runSocial()">Generate</button></div>
+            </div>
+        </div>
+        <div id="social-results"></div>
+    </div>
+
+    <!-- DEFENSE -->
+    <div class="tab-content" id="defense">
+        <div class="card" style="margin-bottom:16px">
+            <h3>Generate Defenses</h3>
+            <div class="grid grid-2" style="margin-top:12px">
+                <div class="form-group"><label>Target</label><input id="defense-target" placeholder="example.com"></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="runDefense()">Generate Defenses</button></div>
+            </div>
+        </div>
+        <div id="defense-results"></div>
+    </div>
+
+    <!-- DECEPTION -->
+    <div class="tab-content" id="deception">
+        <div class="card" style="margin-bottom:16px">
+            <h3>Deploy Deception</h3>
+            <div class="grid grid-2" style="margin-top:12px">
+                <div class="form-group"><label>Target</label><input id="deception-target" placeholder="example.com"></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="runDeception()">Deploy</button></div>
+            </div>
+        </div>
+        <div id="deception-results"></div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="tab-content" id="reports">
+        <div class="card" style="margin-bottom:16px">
+            <h3>Generate Pentest Report</h3>
+            <div class="grid grid-2" style="margin-top:12px">
+                <div class="form-group"><label>Target</label><input id="report-target" placeholder="example.com"></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="runReport()">Generate Report</button></div>
+            </div>
+        </div>
+        <div class="card"><h3>Report Summary</h3><div id="report-results" style="margin-top:8px;font-size:.85rem">No reports generated yet</div></div>
+    </div>
+</div>
+
+<script>
+let ws;
+const API = '';
+const logs = [];
+
+function connectWS() {
+    ws = new WebSocket(`ws://${location.host}/ws`);
+    ws.onopen = () => {
+        document.getElementById('ws-status').className = 'ws-indicator ws-connected';
+        addLog('system', 'WebSocket connected');
+    };
+    ws.onclose = () => {
+        document.getElementById('ws-status').className = 'ws-indicator ws-disconnected';
+        setTimeout(connectWS, 3000);
+    };
+    ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'pong') return;
+        addLog(msg.type, JSON.stringify(msg.data).substring(0, 100));
+    };
+}
+
+function addLog(agent, action) {
+    const now = new Date().toLocaleTimeString();
+    logs.unshift({time: now, agent, action});
+    if (logs.length > 50) logs.pop();
+    const panel = document.getElementById('log-panel');
+    panel.innerHTML = logs.map(l => `<div class="log-entry"><span class="time">[${l.time}]</span> <span class="agent">${l.agent}</span> <span class="action">${l.action}</span></div>`).join('');
+}
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+});
+
+async function fetchStats() {
+    try {
+        const r = await fetch(API + '/api/stats');
+        const d = await r.json();
+        document.getElementById('s-targets').textContent = d.database.targets;
+        document.getElementById('s-findings').textContent = d.database.findings;
+        document.getElementById('s-paths').textContent = d.database.attack_paths;
+        document.getElementById('s-defenses').textContent = d.database.defenses;
+        document.getElementById('sev-critical').textContent = d.database.critical;
+        document.getElementById('sev-high').textContent = d.database.high;
+        document.getElementById('sev-medium').textContent = d.database.medium;
+        document.getElementById('sev-low').textContent = d.database.low;
+        const total = Math.max(d.database.findings, 1);
+        document.getElementById('bar-critical').style.width = (d.database.critical/total*100)+'%';
+        document.getElementById('bar-high').style.width = (d.database.high/total*100)+'%';
+        document.getElementById('bar-medium').style.width = (d.database.medium/total*100)+'%';
+        document.getElementById('bar-low').style.width = (d.database.low/total*100)+'%';
+        const agents = d.agents;
+        const agentList = document.getElementById('agent-list');
+        agentList.innerHTML = Object.entries(agents).map(([name, info]) =>
+            `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #ffffff05"><span>${name}</span><span class="badge badge-${info.status==='running'?'running':'error'}">${info.status}</span><span style="color:#555;font-size:.75rem">${info.cycles} cycles</span></div>`
+        ).join('');
+        document.getElementById('agent-count').textContent = Object.keys(agents).length + ' agents';
+        document.getElementById('uptime').textContent = formatUptime(d.uptime_seconds);
+    } catch(e) {}
+}
+
+function formatUptime(s) {
+    if (s < 60) return s + 's';
+    if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+    return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+
+async function runRecon() {
+    const target = document.getElementById('recon-target').value;
+    const type = document.getElementById('recon-type').value;
+    if (!target) return alert('Enter target');
+    addLog('recon', `Starting recon on ${target}...`);
+    const r = await fetch(API + '/api/recon', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target, type, name:target})});
+    const d = await r.json();
+    document.getElementById('recon-subdomains').innerHTML = (d.subdomains||[]).map(s => `<div style="padding:2px 0">• ${s}</div>`).join('') || 'None found';
+    document.getElementById('recon-tech').innerHTML = (d.tech_stack||[]).map(t => `<div style="padding:2px 0">• ${t}</div>`).join('') || 'None detected';
+    document.getElementById('recon-analysis').textContent = d.ai_analysis || 'No analysis';
+    addLog('recon', `Done: ${(d.subdomains||[]).length} subdomains, ${(d.tech_stack||[]).length} techs`);
+    fetchStats();
+}
+
+async function runVulnScan() {
+    const target = document.getElementById('vuln-target').value;
+    const tid = document.getElementById('vuln-target-id').value;
+    if (!target) return alert('Enter target');
+    addLog('vuln', `Scanning ${target}...`);
+    const r = await fetch(API + '/api/vuln-scan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target, target_id:tid||null, type:'domain'})});
+    const d = await r.json();
+    const tbody = document.getElementById('vuln-table');
+    if (d.vulnerabilities && d.vulnerabilities.length > 0) {
+        tbody.innerHTML = d.vulnerabilities.map(v => `<tr><td>${v.id}</td><td>${v.name}</td><td><span class="badge badge-${v.cvss>=9?'critical':v.cvss>=7?'high':'medium'}">${v.cvss}</span></td><td>${v.type}</td></tr>`).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#555">No vulnerabilities detected in this scan</td></tr>';
+    }
+    addLog('vuln', `Done: ${d.total_findings||0} findings`);
+    fetchStats();
+}
+
+async function runAttackPath() {
+    const target = document.getElementById('attack-target').value;
+    const tid = document.getElementById('attack-target-id').value;
+    if (!target) return alert('Enter target');
+    addLog('exploit', `Generating attack paths for ${target}...`);
+    const r = await fetch(API + '/api/attack-path', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target, target_id:tid||null})});
+    const d = await r.json();
+    const container = document.getElementById('attack-paths-container');
+    if (d.attack_paths && d.attack_paths.length > 0) {
+        container.innerHTML = d.attack_paths.map(p => `
+            <div class="card" style="margin-bottom:12px">
+                <h3>${p.name}</h3>
+                <div style="margin:8px 0;font-size:.8rem;color:#888">Risk: <span class="badge badge-${p.total_risk>1?'critical':p.total_risk>0.5?'high':'medium'}">${p.total_risk}</span> | Success: ${(p.success_probability*100).toFixed(1)}% | Steps: ${p.step_count}</div>
+                ${p.steps.map(s => `<div class="attack-step"><strong>${s.name}</strong><br><span class="mitre">${s.mitre_id} | ${s.tactic} | Success: ${(s.success_rate*100).toFixed(0)}%</span></div>`).join('')}
+            </div>
+        `).join('');
+    } else {
+        container.innerHTML = '<div class="card"><p style="color:#555">No attack paths generated. Run recon and vuln scan first.</p></div>';
+    }
+    addLog('exploit', `Done: ${(d.attack_paths||[]).length} paths`);
+    fetchStats();
+}
+
+async function runSocial() {
+    const target = document.getElementById('social-target').value;
+    const type = document.getElementById('social-type').value;
+    if (!target) return alert('Enter target');
+    addLog('social', `Generating ${type} campaign for ${target}...`);
+    const r = await fetch(API + '/api/social', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target, campaign_type:type, target_id:null})});
+    const d = await r.json();
+    const el = document.getElementById('social-results');
+    el.innerHTML = `<div class="card"><h3>${d.template_name||'Campaign'}</h3><p style="color:#888;font-size:.8rem;margin:8px 0">${d.email_count||0} templates generated</p>${(d.emails||[]).map(e => `<div style="background:#1a1a28;padding:8px 12px;margin:4px 0;border-radius:4px;font-size:.8rem"><strong>${e.persona}</strong> &lt;${e.sender}&gt;<br>Subject: ${e.subject}<br>Success Rate: ${(e.success_probability*100).toFixed(0)}%</div>`).join('')}</div>`;
+    addLog('social', `Done: ${d.email_count||0} templates`);
+    fetchStats();
+}
+
+async function runDefense() {
+    const target = document.getElementById('defense-target').value;
+    if (!target) return alert('Enter target');
+    addLog('defense', `Generating defenses for ${target}...`);
+    const r = await fetch(API + '/api/defend', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target, target_id:null})});
+    const d = await r.json();
+    const el = document.getElementById('defense-results');
+    el.innerHTML = `<div class="card"><h3>Defenses Generated: ${d.total_defenses||0}</h3>${(d.defenses||[]).map(df => `<div style="background:#1a1a28;padding:8px 12px;margin:4px 0;border-radius:4px;font-size:.8rem"><span class="badge badge-${df.priority==='critical'?'critical':df.priority==='high'?'high':'medium'}">${df.priority}</span> <strong>${df.type}</strong>: ${df.rule}</div>`).join('')}<h3 style="margin-top:16px">Hardening Rules</h3>${(d.hardening_rules||[]).map(h => `<div style="padding:4px 0;font-size:.8rem">• <strong>${h.area}</strong>: ${h.rule} <span class="badge badge-${h.priority==='critical'?'critical':h.priority==='high'?'high':'medium'}">${h.priority}</span></div>`).join('')}</div>`;
+    addLog('defense', `Done: ${d.total_defenses||0} defenses`);
+    fetchStats();
+}
+
+async function runDeception() {
+    const target = document.getElementById('deception-target').value;
+    if (!target) return alert('Enter target');
+    addLog('deception', `Deploying deception for ${target}...`);
+    const r = await fetch(API + '/api/deceive', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target, target_id:null})});
+    const d = await r.json();
+    const el = document.getElementById('deception-results');
+    el.innerHTML = `<div class="grid grid-2"><div class="card"><h3>Honeypots (${(d.honeypots||[]).length})</h3>${(d.honeypots||[]).map(h => `<div style="padding:4px 0;font-size:.8rem">• <strong>${h.type}</strong>: ${h.config.name} (port ${h.config.port}) <span class="badge badge-running">${h.status}</span></div>`).join('')}</div><div class="card"><h3>Canary Tokens (${(d.canaries||[]).length})</h3>${(d.canaries||[]).map(c => `<div style="padding:4px 0;font-size:.8rem">• <strong>${c.type}</strong>: ${c.config.name} <span class="badge badge-running">${c.status}</span></div>`).join('')}</div></div><div class="card" style="margin-top:16px"><h3>Deception Paths</h3>${(d.deception_paths||[]).map(dp => `<div style="padding:4px 0;font-size:.8rem">• <strong>${dp.name}</strong>: ${dp.description}</div>`).join('')}</div>`;
+    addLog('deception', `Done: ${d.total_deployments||0} deployments`);
+    fetchStats();
+}
+
+async function runReport() {
+    const target = document.getElementById('report-target').value;
+    if (!target) return alert('Enter target');
+    addLog('report', `Generating report for ${target}...`);
+    const r = await fetch(API + '/api/report', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target, target_id:null})});
+    const d = await r.json();
+    const el = document.getElementById('report-results');
+    el.innerHTML = `<div class="grid grid-2" style="margin-bottom:12px"><div><strong>Total Findings:</strong> ${d.total_findings||0}</div><div><span class="badge badge-critical">Critical: ${d.critical||0}</span> <span class="badge badge-high">High: ${d.high||0}</span></div></div><div><strong>Attack Paths:</strong> ${d.attack_paths||0} | <strong>Defenses:</strong> ${d.defenses||0} | <strong>Deceptions:</strong> ${d.deceptions||0}</div><div style="margin-top:12px;padding:12px;background:#1a1a28;border-radius:4px;font-size:.85rem;white-space:pre-wrap">${d.executive_summary||'No summary'}</div><div style="margin-top:12px"><strong>Top Recommendations:</strong>${(d.recommendations||[]).map((r,i) => `<div style="padding:4px 0;font-size:.8rem">${i+1}. [${r.priority.toUpperCase()}] ${r.action}</div>`).join('')}</div>`;
+    addLog('report', `Done: ${d.total_findings||0} findings, ${d.report_length||0} chars`);
+    fetchStats();
+}
+
+// Init
+connectWS();
+fetchStats();
+setInterval(fetchStats, 5000);
+setInterval(() => ws && ws.readyState === 1 && ws.send('ping'), 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  redteam-engine:
+    build: .
+    ports:
+      - "80:80"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
