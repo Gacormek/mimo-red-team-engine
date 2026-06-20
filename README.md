@@ -10,7 +10,7 @@
 
 ## Demo
 
-**Live:** http://43.153.206.68
+**Live:** http://your-mimo-server
 
 ---
 

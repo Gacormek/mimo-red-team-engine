@@ -8,7 +8,7 @@ PORT = 80
 DB_PATH = "/root/mimo-red-team-engine/data/redteam.db"
 
 # ── MiMo LLM ──────────────────────────────────────────────────
-MIMO_API_URL = "http://43.153.206.68:20128/v1/chat/completions"
+MIMO_API_URL = os.getenv("MIMO_API_URL")
 MIMO_MODEL = "xmtp/mimo-v2.5-pro"
 MIMO_MAX_TOKENS = 2000
 
